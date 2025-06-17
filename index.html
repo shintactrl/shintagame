@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Game Mengingat Benda - Lucu</title>
+  <!-- Tambahkan SweetAlert2 CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    body {
+      font-family: 'Comic Sans MS', cursive, sans-serif;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+      color: #333;
+      background: linear-gradient(270deg, #f8bbd0, #fce4ec, #f3e5f5, #e1f5fe);
+      background-size: 800% 800%;
+      animation: gradientFlow 20s ease infinite;
+    }
+    @keyframes gradientFlow {
+      0% {background-position: 0% 50%;}
+      50% {background-position: 100% 50%;}
+      100% {background-position: 0% 50%;}
+    }
+    h1 {
+      margin-bottom: 10px;
+    }
+    #scoreboard {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 10px;
+    }
+    .player {
+      padding: 10px 20px;
+      margin: 0 10px;
+      border-radius: 10px;
+      background: #fff0f5;
+      font-weight: bold;
+      border: 2px dashed #f06292;
+    }
+    .player.active {
+      background: #fff59d;
+    }
+    #timer {
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+    #game-board {
+      display: grid;
+      grid-template-columns: repeat(8, 60px);
+      grid-gap: 10px;
+      justify-content: center;
+      margin: auto;
+    }
+    .card {
+      width: 60px;
+      height: 60px;
+      background-color: #ffffffaa;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      cursor: pointer;
+      user-select: none;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      transition: transform 0.2s;
+    }
+    .card.flipped {
+      background-color: #ffffff;
+      transform: scale(1.1);
+    }
+    .card.matched {
+      background-color: #c8e6c9;
+      cursor: default;
+    }
+    #modal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.8);
+      background: #ffffffee;
+      border-radius: 15px;
+      padding: 30px 20px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      width: 300px;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s ease;
+      z-index: 999;
+    }
+    #modal.show {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    .modal-buttons {
+      margin-top: 20px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .modal-buttons button {
+      padding: 10px 20px;
+      font-size: 14px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    #play-again {
+      background: #4caf50;
+      color: white;
+    }
+    #exit-game {
+      background: #f44336;
+      color: white;
+    }
+    .sparkle {
+      animation: sparkle 1s infinite alternate;
+      background-image: radial-gradient(circle, #fff176 20%, transparent 20%);
+      background-size: 20px 20px;
+    }
+    @keyframes sparkle {
+      from { background-position: 0 0; }
+      to { background-position: 10px 10px; }
+    }
+    .back-button {
+      margin-top: 20px;
+    }
+    .back-button button {
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 6px;
+      background: #2196f3;
+      color: white;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Pasangkan Aku</h1>
+<div id="scoreboard">
+  <div id="player1" class="player active">Pemain 1: <span id="score1">0</span></div>
+  <div id="player2" class="player">Pemain 2: <span id="score2">0</span></div>
+</div>
+<div id="timer">Waktu Tersisa: <span id="time">60</span> detik</div>
+<div id="game-board"></div>
+
+<div id="modal">
+  <h2 id="modal-winner">🎉 Pemenang</h2>
+  <div class="modal-buttons">
+    <button id="play-again">Main Lagi</button>
+    <button id="exit-game">Keluar</button>
+  </div>
+</div>
+
+<div class="back-button">
+  <button id="back-button">⟵ Kembali ke Beranda</button>
+</div>
+
+<audio id="match-sound" src="https://assets.mixkit.co/sfx/download/mixkit-achievement-bell-600.wav"></audio>
+<audio id="fail-sound" src="https://assets.mixkit.co/sfx/download/mixkit-wrong-answer-bass-buzzer-948.wav"></audio>
+
+<script>
+  const items = [
+    "🍓", "🍇", "🍉", "🍒", "🍍",
+    "🍦", "🍪", "🍰", "🧁", "🍔",
+    "🧃", "🍭", "🍕", "🐶", "🐱",
+    "🐰", "🐼", "🐷", "🐸", "🐥"
+  ];
+
+  const board = document.getElementById("game-board");
+  const score1 = document.getElementById("score1");
+  const score2 = document.getElementById("score2");
+  const player1 = document.getElementById("player1");
+  const player2 = document.getElementById("player2");
+  const timerDisplay = document.getElementById("time");
+  const modal = document.getElementById("modal");
+  const modalWinner = document.getElementById("modal-winner");
+  const playAgainBtn = document.getElementById("play-again");
+  const exitBtn = document.getElementById("exit-game");
+  const matchSound = document.getElementById("match-sound");
+  const failSound = document.getElementById("fail-sound");
+  const backButton = document.getElementById("back-button");
+
+  let cards = [];
+  let first = null;
+  let second = null;
+  let lock = false;
+  let matched = 0;
+  let scores = [0, 0];
+  let currentPlayer = 0;
+  let timeLeft = 60;
+  let interval;
+  let gameEnded = false;
+
+  function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+  }
+
+  function resetGame() {
+    clearInterval(interval);
+    board.innerHTML = '';
+    modal.classList.remove("show");
+    player1.classList.add("active");
+    player2.classList.remove("active");
+    player1.classList.remove("sparkle");
+    player2.classList.remove("sparkle");
+    scores = [0, 0];
+    matched = 0;
+    timeLeft = 60;
+    gameEnded = false;
+    updateScores();
+    currentPlayer = 0;
+    cards = [...items, ...items];
+    shuffle(cards);
+    createBoard();
+    startTimer();
+  }
+
+  function updateScores() {
+    score1.textContent = scores[0];
+    score2.textContent = scores[1];
+  }
+
+  function switchPlayer() {
+    currentPlayer = 1 - currentPlayer;
+    player1.classList.toggle("active", currentPlayer === 0);
+    player2.classList.toggle("active", currentPlayer === 1);
+  }
+
+  function resetTurn() {
+    [first, second] = [null, null];
+    lock = false;
+  }
+
+  function endGame() {
+    gameEnded = true;
+    clearInterval(interval);
+    let result = "";
+    if (scores[0] > scores[1]) {
+      result = "🎉 Pemain 1 Menang!";
+      player1.classList.add("sparkle");
+    } else if (scores[1] > scores[0]) {
+      result = "🎉 Pemain 2 Menang!";
+      player2.classList.add("sparkle");
+    } else {
+      result = "🤝 Seri!";
+    }
+    modalWinner.textContent = result;
+    modal.classList.add("show");
+  }
+
+  function createBoard() {
+    cards.forEach((item, index) => {
+      const card = document.createElement("div");
+      card.classList.add("card");
+      card.dataset.value = item;
+      card.dataset.index = index;
+      card.addEventListener("click", flipCard);
+      board.appendChild(card);
+    });
+  }
+
+  function flipCard(e) {
+    if (gameEnded) return;
+    const card = e.target;
+    if (lock || card.classList.contains("flipped") || card.classList.contains("matched")) return;
+
+    card.classList.add("flipped");
+    card.textContent = card.dataset.value;
+
+    if (!first) {
+      first = card;
+      return;
+    }
+
+    second = card;
+    lock = true;
+
+    if (first.dataset.value === second.dataset.value) {
+      matchSound.play();
+      first.classList.add("matched");
+      second.classList.add("matched");
+      scores[currentPlayer]++;
+      matched++;
+      updateScores();
+      resetTurn();
+
+      if (matched === items.length) {
+        endGame();
+      }
+    } else {
+      failSound.play();
+      setTimeout(() => {
+        first.classList.remove("flipped");
+        second.classList.remove("flipped");
+        first.textContent = "";
+        second.textContent = "";
+        resetTurn();
+        switchPlayer();
+      }, 1000);
+    }
+  }
+
+  function startTimer() {
+    timerDisplay.textContent = timeLeft;
+    interval = setInterval(() => {
+      timeLeft--;
+      timerDisplay.textContent = timeLeft;
+      if (timeLeft <= 0) {
+        endGame();
+      }
+    }, 1000);
+  }
+
+  playAgainBtn.addEventListener("click", () => {
+    resetGame();
+  });
+
+  exitBtn.addEventListener("click", () => {
+    modalWinner.textContent = "👋 Terima kasih sudah bermain!";
+    setTimeout(() => {
+      window.close();
+    }, 1500);
+  });
+
+  // ✅ Konfirmasi tombol kembali pakai SweetAlert2
+  backButton.addEventListener("click", () => {
+    Swal.fire({
+      title: 'Apakah Anda yakin?',
+      text: "Anda akan kembali ke menu utama.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Ya, kembali!',
+      cancelButtonText: 'Batal'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        window.location.href = "menu.html";
+      } else {
+        Swal.fire('Baik, tetap di sini!', '', 'info');
+      }
+    });
+  });
+
+  resetGame();
+</script>
+
+</body>
+</html>
